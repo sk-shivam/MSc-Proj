@@ -1,0 +1,459 @@
+---
+title: "PSI-CA-Part-II"
+output: html_notebook
+---
+#### Student Number: D18129848
+#### Student Name: Shivam Khandelwal
+#### Program Code: DT228A/TU059 (Msc-DA-FT)
+#### Version used: Version 1.2.5001
+
+Following R packages must be installed and run before the start of the predictive analysis
+```{r}
+#Importing all required dataset libraries
+library(pastecs)
+library(ggplot2) 
+library(semTools) 
+library(psych) 
+library(foreign)
+library(dplyr) 
+library(userfriendlyscience)
+library(stats)
+library(FSA)
+library(magrittr)
+library(car)
+library(lmSupport)
+library(lm.beta)
+library(stargazer)#For formatting outputs/tables
+library(coin)
+library(Epi)#ROC Curve
+library(rcompanion)#Pseudo Rsquared statistics
+library(arm)#for invlogit calculating predicted probabilities
+```
+# 1. Introduction
+### 1.1 Background:
+#### With the recent advancements in data collection and information handling, it has been widely possible to interpret, analyze, predict and influence the characteristics and features of the area of study. We have seen how various organizations are working on huge amount of data to come up with the solutions and become a gamechanger. Fields like astronomy, education, stock market, automation, warehousing and many more are using data effectively to sustain and improvise their practices that best suit the demands. With thorough study of previous data sometimes the future seems more predictable and chances become high that predictions hold true. In this assignment, we are going to cover one such field and see how the factors influence the outcomes and how predictive is the real-world data.
+
+#### We are going to study how the data understanding can be helpful in prediction and making assumptions in the field of education through exploratory analysis of a recorded dataset of students of two schools and the various factors influencing their grades and other aspects of recorded data.
+
+### 1.2 Concepts of Interest:
+#### With the help of this part of continuous assessment, we wish to study the factors that influence the grades of students (In Part-A) and then in the following part (Part-B) we are going to see how we can segregate and get an understanding of students who are and who are not involved in any romantic relationships with the help of some adjoining factors. 
+
+### 1.3 Supporting Arguments:
+#### For the purpose of study we have seen the primary factors in education fields is no more just the type of education being delivered in the schools but also different personal and social life factors that influence student studies, we are going to see whether factors like their previous marks, Gender and past failures affect their scores or not and if yes, upto what extent through this data can we actually see the extent of affect.
+
+### 1.4 Problem Description:
+#### We wish to know what affects the overall grades of students, however we are not considering all the factors from the dataset, but just three of them which are 1) Past failures in the subject. 2) Their gender. 3)Their last scores obtained. This part we are going to explore in Part-1 of the assignment.
+
+#### Secondly we are interested in which kind of students based on their sex and whether they are involved in co-curricular activities are most likely to be in a relationship. Again we are just considering these two factors because it isn't possible to consider each and every variable as a affecting factor. This we are going to explore in Part-2 of the assignment.
+
+### 1.5 Approach:
+#### For the first part of assignment we are going to use Multiple Linear regression and for the second part of the assignment we are going to use Logistic regression.
+
+### 1.6 Sources Citation:
+#### George, D., & Mallery, M. (2010). SPSS for Windows Step by Step: A Simple Guide and Reference
+#### Andy Field's Guide: http://www.discoveringstatistics.com/docs/writinglabreports.pdf last recovered on Jan-02-2020.
+#### Lecture and Lab notes delivered to MSc Data Analytics by Deirdre Lawless for the year 2019-2020.
+#### Dataset has been taken from: https://archive.ics.uci.edu/ml/machine-learning-databases/00320/
+
+
+
+# 2. Method
+### 2.1 Dataset Description and Details:
+#### For the purpose of this assignment we have fetched the data from:
+#### https://archive.ics.uci.edu/ml/machine-learning-databases/00320/
+#### This dataset includes two files namely student-por.csv and student-mat.csv i.e. this includes two datasets separated by students scores in Portuguese and Mathematics resectively. The two schools from whom this dataset has been collected are:
+#### Gabriel Pereira school (GP)
+#### Mousinho da Silveira school (MS)
+#### The school authorities ask students to fill a questionnaire which involves all their personal details from family to drinking habits to relationship to time spent on various activities. They combine the questionnaire results with the grades that student got in their mathematics and Portuguese examination. For the purpose of this assignment we have combined both the datasets. Below is the R code for importing the data files and combning the results to a single data file called 'coursedata', which will be used for further operations in this assignment 
+```{r}
+student_mat <- read.csv("student-mat.csv", stringsAsFactors = FALSE, sep=';')
+student_por <- read.csv("student-por.csv", stringsAsFactors = FALSE, sep=';')
+coursedata<-merge(student_mat,student_por, by=c ("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+```
+#### In order to summarise the data we use the following R command and see the result as follows:
+```{r}
+summary(coursedata)
+```
+#### The resultant coursedata contains 382 rows (objects) with 53 variables, variables other than the adjoining variables which were used for the combination have been marked as .x and .y respectively for Maths and Portuguese.
+
+### 2.2 Dataset Modification:
+#### In this section, we are going to address the issue of nominal variables which we want to use in our further predictive analysis. We have included variables- Sex, active.y (defining the co-curricular activities activeness for student of Portuguese), romantic.y (defining the student swho study portuguese and are involved in a romantic relationship)For this we are going to create dummy variables as shown below:
+```{r}
+coursedata$GIRL=recode(coursedata$sex,"'M'=0;'F'=1")
+coursedata$IsRomantic=recode(coursedata$romantic.y,"'yes'=1;'no'=0")
+coursedata$IsActive=recode(coursedata$activities.y,"'yes'=1;'no'=0")
+```
+#### Upon this modification, three extra variables- GIRL(0=No, 1=Yes), IsRomantic (0=No, 1=Yes), IsActive (0=No, 1=Yes) will be added to the coursedata. So now our desired dataset has 382 objects with 56 variables.
+
+#### Along with these variables, we are going to study continuous variable G1.y and G3.y reflecting the Portuguese marks for students at interval-1 and final portuguese marks.
+
+# 3. Results
+### 3.1 Overview:
+#### With the variables undertaken to study, in the Part-1, with the help of linear regression, we will be seeing the affect of variables Sex, Scores at interval-1 and Failures on the Overall score of Protuguese for the students. All the variables have their own impact levels.
+#### In the second part, with the help of logistic regression, we will try to understand how categorically the students who are in romantic relationship are categorised on the basis of factors Activity participation and Gender.
+
+### 3.2 Analysis Conducted:
+#### For the purpose of assessing normality and fit of the data for predictive modelling, various statistical analysis were done:
+
+#### 1. Portuguese Final Grade
+```{r}
+#checking portuguese final grade for normality
+pastecs::stat.desc(coursedata$G3.y, basic=F)
+
+#skewness and kurtosis check
+tpskew<-semTools::skew(coursedata$G3.y)
+tpkurt<-semTools::kurtosis(coursedata$G3.y)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+
+#Histogram
+gg <- ggplot(coursedata, aes(x=coursedata$G3.y))
+gg <- gg + labs(x="Final Por Grade")
+gg <- gg + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gg <- gg + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gg <- gg + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$G3.y, na.rm=TRUE), sd=sd(coursedata$G3.y, na.rm=TRUE)))
+gg
+
+#Standardised score
+sort(scale(coursedata$G3.y))
+```
+#### 2. Portuguese Grade at interval-1:
+```{r}
+#checking portuguese interval-1 grade for normality
+pastecs::stat.desc(coursedata$G1.y, basic=F)
+
+#skewness and kurtosis check
+tpskew<-semTools::skew(coursedata$G1.y)
+tpkurt<-semTools::kurtosis(coursedata$G1.y)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+
+#Histogram
+gg <- ggplot(coursedata, aes(x=coursedata$G1.y))
+gg <- gg + labs(x="Por Grade at interval 1")
+gg <- gg + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gg <- gg + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gg <- gg + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$G1.y, na.rm=TRUE), sd=sd(coursedata$G1.y, na.rm=TRUE)))
+gg
+
+#Standardised score
+sort(scale(coursedata$G1.y))
+```
+#### Past Failures in portuguese:
+```{r}
+#Normality for past failures in portuguese
+pastecs::stat.desc(coursedata$failures.y, basic=F)
+
+#skewness and kurtosis check
+tpskew<-semTools::skew(coursedata$failures.y)
+tpkurt<-semTools::kurtosis(coursedata$failures.y)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+
+#Histogram
+gs <- ggplot(coursedata, aes(x=coursedata$failures.y))
+gs <- gs + labs(x="No. of Failures")
+gs <- gs + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gs <- gs + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gs <- gs + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$failures.y, na.rm=TRUE), sd=sd(coursedata$failures.y, na.rm=TRUE)))
+gs
+
+#standardised score
+sort(scale(coursedata$failures.y))
+```
+#### We can see that these variables have been fairly normalised in the dataset.
+
+#### Descriptive analysis to understand a fair variation of the following variables in the dataset:
+```{r}
+#Descriptive statistics sex distribution
+table(coursedata$sex)
+
+#Descriptive Analysis by activities for portuguese students (yes or no)
+table(coursedata$activities.y)
+
+#Descriptive Analysis by whether romantic or not for portuguese students (yes or no)
+table(coursedata$romantic.y)
+```
+#### We can see that above variables have a fair distribution in the dataset, hence can be considered for further analysis.
+
+### 3.2 Difference and co-relation to understand whether the above variables are suitable for predictive model building.
+```{r}
+#T-test to establish that there lies a difference on the basis of the predictor variable-sex
+car::leveneTest(G3.y~as.factor(sex), data=coursedata)
+t.test(G3.y~as.factor(sex), data=coursedata, var.equal =TRUE)
+```
+#### A significant difference has been observed in the two groups with F scoring at an average 13.08 and M scoring 11.9 in the Portuguese final exam, hence this variable can be considered for predictive modelling,
+
+```{r}
+#Spearman test to establish co-relation in past failure and Final portuguese grades
+#Simple scatterplot of Final grades vs failures
+#aes(x,y)
+scatter <- ggplot(coursedata, aes(coursedata$failures.y, coursedata$G3.y))
+scatter + geom_point() + geom_smooth(method = "lm", colour = "Red", se = F)+ labs(x = "failures", y = "Final Portuguese grade")
+stats::cor.test(coursedata$failures.y, coursedata$G3.y, method='spearman')
+```
+#### With the rho value of -0.34, this is moderately significant co-relation between the number of failures and Final output grade in portuguese, so we will be considering this as well.
+```{r}
+#Pearson test to establish co-relation in Portuguese grades at interval-1 and Final portuguese grades
+#Simple scatterplot of Final grades vs Grades at interval-1
+#aes(x,y)
+scatter <- ggplot(coursedata, aes(coursedata$G1.y, coursedata$G3.y))
+scatter + geom_point() + geom_smooth(method = "lm", colour = "Red", se = F)+ labs(x = "Interval-1 grades", y = "Final Portuguese grade")
+stats::cor.test(coursedata$G1.y, coursedata$G3.y, method='spearman')
+```
+#### With a high co-relation coefficient rho=0.86, this factor certainly has a larger impact on the final portuguese grade.
+```{r}
+#Getting a overview of mean differences for students involved in romantic relationship with respect to their sex and their involvement in co-curricular activities.
+psych::describeBy(coursedata$IsRomantic,coursedata$sex)
+psych::describeBy(coursedata$IsRomantic,coursedata$activities.y)
+```
+#### We can clearly see from above that their is a difference in the mean when the dataset is divided between male and female and between the people who did and did not participate in the co-curricular activities.
+
+### 3.3 Option-A models:
+### Model-1: 
+#### Multiple Linear regression model for nominal variable GIRL and scores at interval 1 for predicting Final portuguese scores.
+```{r}
+#Building Models- Multiple Linear regression model
+
+```
+```{r}
+model1<-lm(coursedata$G3.y~coursedata$G1.y+coursedata$GIRL)
+
+stargazer(model1, type="text") #Tidy output of all the required stats
+```
+#### Checking Assumptions:
+```{r}
+#Influential Outliers - Cook's distance
+cooksd<-sort(cooks.distance(model1))
+# plot Cook's distance
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+
+```
+#### Finding rows with influential observations
+```{r}
+influential <- as.numeric(names(cooksd)[(cooksd > 4*mean(cooksd, na.rm=T))])  # influential row numbers
+stem(influential)
+```
+
+#### influential observations:
+```{r}
+head(coursedata[influential, ])  # influential observations.
+```
+
+#### Checking G1.y, G3.y and GIRL:
+```{r}
+head(coursedata[influential, ]$G1.y)  # influential observations - look at the values of G1.y
+head(coursedata[influential, ]$G3.y)  # influential observations - look at the values of G3.y
+head(coursedata[influential, ]$GIRL) 
+```
+
+#### Outlier Test:
+```{r}
+car::outlierTest(model1)
+```
+
+#### Leverage Plots:
+```{r}
+car::leveragePlots(model1)
+```
+
+#### Homoscedasticity- Residual, standard residual and density plot of residuals:
+```{r}
+plot(model1,1)
+plot(model1, 3)
+plot(density(resid(model1)))
+```
+
+#### QQ plot of model:
+```{r}
+car::qqPlot(model1, main="QQ Plot")
+```
+
+#### Collinearity of model:
+```{r}
+vifmodel<-car::vif(model1)
+vifmodel
+```
+
+#### Tolerance of model:
+```{r}
+1/vifmodel
+```
+#### Model summary:
+```{r}
+summary(model1)
+```
+
+
+#### A multiple Linear regression analysis was conducted with a student’s final portuguese grades (G3.y) the outcome variable with student's score at interval 1 in portuguese and Sex of student being attended as predictors. 
+#### The model was observed to be significant. Regression Equation: 1.05+(0.93*coursedata$G1.y)+(0.35*coursedata$GIRL) 
+
+#### The data met the assumption for independent observations. Examination for multicollinearity showed that the tolerance and variance influence factor measures were within acceptable levels (tolerance >0.4, VIF <2.5 ) as outlined in Tarling (2008).  
+
+### Model-2: 
+#### Multiple Linear regression model for nominal variable GIRL and scores at interval 1 along with the variable failures in Portuguese for predicting Final portuguese scores.
+```{r}
+#Model-2(Scores at interval-1 and sex along with past failures as predictor for Final G3 scores):
+model2<-lm(coursedata$G3.y~coursedata$G1.y+coursedata$GIRL+coursedata$failures.y)
+
+stargazer(model2, type="text") #Tidy output of all the required stats
+
+```
+
+#### Checking Assumptions:
+```{r}
+#Check assumptions
+
+#Influential Outliers - Cook's distance
+cooksd<-sort(cooks.distance(model2))
+# plot Cook's distance
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+```
+#### Influential observations:
+```{r}
+#find rows related to influential observations
+influential <- as.numeric(names(cooksd)[(cooksd > 4*mean(cooksd, na.rm=T))])  # influential row numbers
+stem(influential)
+head(coursedata[influential, ]) 
+```
+#### G1.y, G3.y, GIRL and Failures:
+```{r}
+head(coursedata[influential, ]$G1.y)  # influential observations - look at the values of G1.y
+head(coursedata[influential, ]$G3.y)  # influential observations - look at the values of G3.y
+head(coursedata[influential, ]$GIRL) 
+head(coursedata[influential, ]$failures.y) 
+```
+
+#### Boneforroni p-values for extreme:
+```{r}
+car::outlierTest(model2)
+```
+
+#### Leverage plots:
+```{r}
+car::leveragePlots(model2) 
+```
+
+#### Homoscedasticity:
+```{r}
+plot(model2,1)
+plot(model2,3)
+```
+
+#### Residuals Density plot:
+```{r}
+plot(density(resid(model2))) 
+```
+
+#### QQ plot:
+```{r}
+car::qqPlot(model2, main="QQ Plot Model 2")
+```
+
+#### Tolerance and collinearity:
+```{r}
+vifmodel<-car::vif(model2)
+vifmodel
+
+#Tolerance
+1/vifmodel
+```
+#### Model Summary:
+```{r}
+summary(model2)
+```
+
+
+#### A multiple Linear regression analysis was conducted with a student’s final portuguese grades (G3.y) the outcome variable with student's score at interval 1 in portuguese, Sex of student and number of past failures (failure.y) being attended as predictors.
+
+#### The model was observed to be significant. Regression Equation: 1.55+(0.89*coursedata$G1.y)+(0.30*coursedata$GIRL)-(0.57*coursedata$failures.y) 
+
+#### The data met the assumption for independent observations. Examination for multicollinearity showed that the tolerance and variance influence factor measures were within acceptable levels (tolerance >0.4, VIF <2.5 ) as outlined in Tarling (2008). 
+
+
+### Both models comparison:
+```{r}
+stargazer::stargazer(model1, model2, type="text")
+```
+#### With the comparison of two models built successively adding the failure as the other predictor variable for the second model. We see that the first model in itself was predicting scores to a optimum level with 93.2% predictability with scores at inteval-1. But with the adjusted R-square value of both the models, we are able to see that the model-2 (68.1%) explains variance more than the model-1 (67.2%)
+
+
+### 3.4 Option-B model: 
+#### Here we have designed a logistic model for classifying the students that are involved in romantic relationship on the basis of their participation in activities and sex.
+```{r}
+#Building Model
+logmodel31 <- glm(IsRomantic ~IsActive, data = coursedata, na.action = na.exclude, family = binomial(link=logit))
+
+#Add variable for GIRL in the model
+logmodel3<- glm(IsRomantic~IsActive+GIRL, data = coursedata, na.action = na.exclude, family = binomial(link=logit))
+
+stargazer(logmodel3, type="text")
+```
+
+#### Summarising and Assessing fit of the model:
+```{r}
+summary(logmodel3)
+lmtest::lrtest(logmodel3)
+
+rcompanion::nagelkerke(logmodel3,restrictNobs=TRUE)
+exp(coefficients(logmodel3))
+```
+
+#### Further assessment of assumptions
+```{r}
+#Check the assumption of linearity of independent variables and log odds using a Hosmer-Lemeshow test, if this is not statsitically significant we are ok
+generalhoslem::logitgof(coursedata$IsActive, fitted(logmodel3))
+generalhoslem::logitgof(coursedata$GIRL, fitted(logmodel3))
+#Collinearity
+vifmodel<-car::vif(logmodel3) 
+vifmodel
+
+#Tolerance
+1/vifmodel
+```
+
+```{r}
+#odds ratio
+cbind(Estimate=round(coef(logmodel3),4),
+      OR=round(exp(coef(logmodel3)),4))
+
+```
+
+
+#### Probabilities as estimated by the model for being in romantic relationship under various factors:
+```{r}
+#Probability of being in relationship when male and when participating in activity
+arm::invlogit(coef(logmodel3)[1]+ coef(logmodel3)[2]*0 +coef(logmodel3)[3]*1)
+
+#Probability of being in relationship when female and when participating in activity
+arm::invlogit(coef(logmodel3)[1]+ coef(logmodel3)[2]*1 +coef(logmodel3)[3]*1)
+
+#Probability of being in relationship when male and when not participating in activity
+arm::invlogit(coef(logmodel3)[1]+ coef(logmodel3)[2]*0 +coef(logmodel3)[3]*0)
+
+#Probability of being in relationship when female and when not participating in activity
+arm::invlogit(coef(logmodel3)[1]+ coef(logmodel3)[2]*1 +coef(logmodel3)[3]*0)
+```
+#### As we can see defined by the intercepts, there is more probability of male and female being in a relationship when participating in a activity (34.04% and 37.90% respectively) as compared to male and female when not participating in a activity (26.29% and 29.67% respectively).
+
+```{r}
+Epi::ROC(form=coursedata$IsRomantic ~ coursedata$IsActive+coursedata$GIRL, plot="ROC")
+```
+
+
+#### A multinomial logistic regression analysis was conducted with a student’s involvement in a romantic relationship as the outcome variable with student's sex, involvement in co-curricular activities as predictors. 
+
+#### As observed, there is more probability of male and female being in a romantic relationship when participating in a activity (34.04% and 37.90% respectively) as compared to male and female when not participating in a activity (26.29% and 29.67% respectively).
+
+
+### 4. Discussion:
+#### Through the above regression models, we have been able to justify the linear models with a significant impact of the variables that we supposed to impact the final portuguese grades. These factors were Student Gender, Previous interval score in Portuguese. But upon addition of another variable, "Past Failures"in subject, our second linear regression model with the adjusted R-square value of model-2 (68.1%) explains variance more than the model-1 (67.2%).
+
+#### Also on the second part of the Assignment, we developed a logistic regression model to observe the probability of students being in a romantic relationship was dependent on their sex and whether or not they were active in co-curricular activities.We observed the Girls had higher probability than the boys and that the students (both girls and boys) who had been participating in the co-curricular activities had more probability of getting involved in a romantic relationship than the students who did not participated in these activities.
+
+#### 4.1 Further improvements:
+#### For the purpose of further improvement and exploration, we can consider other factors like studytime, freetime etc for the students, because these are some additional factors that might be affecting the personal and academic life of students.
