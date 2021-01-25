@@ -1,0 +1,385 @@
+---
+title: "PSI-CA-Part-I"
+output: html_notebook
+---
+#### Student Number: D18129848
+#### Student Name: Shivam Khandelwal
+#### Program Code: DT228A/TU059 (Msc-DA-FT)
+#### Version used: Version 1.2.5001
+```{r}
+#Importing all required dataset libraries
+library(pastecs)
+library(ggplot2) 
+library(semTools) 
+library(psych) 
+library(foreign)
+library(dplyr) 
+library(userfriendlyscience)
+library(stats)
+library(FSA)
+library(rstatix)
+library(magrittr)
+library(car)
+library(coin)
+
+```
+# 1. Introduction
+### 1.1 Background
+#### In this assignment we are going to study various factors responsible for affecting grades of students across two subjects Maths and Portuguese. Also we have tried to study the parents behaviour from the dataset in one of the hypotheses.
+
+### 1.2 Dataset Description
+#### We are going to study the following variables out of our dataset that comprises of various details of students (in the order they are being used in the assignment):
+#### 1. Coursedata- It is a merged table of Maths and Portuguese datasets.
+#### 2. G3.y- Portuguese Final Grades
+#### 3. failures.y- Number of past failures in Portuguese
+#### 4. Medu- Mother's Education level
+#### 5. Fedu- Father's Education level
+#### 6. G3.x- Maths final Grades
+#### 7. Sex- Student's Gender
+#### 8. Paid.x- Paid Extra class in subject (Maths)
+#### 8. health.y- Students current health status (Portuguese)
+
+### 1.2 Hypotheses
+#### 1. There is an negative impact of previous failures on the final grades of students (Portuguese). (Co-relation)
+#### 2. Student's parents tend to chose their partner with similar education level. (Co-relation)
+#### 3. Males tend to get higher grades than females in mathematics. (Difference with categorical variable 2 values)
+#### 4. Students who take paid extra class tend to score higher grades than those who don't (Maths). (Difference with categorical variable 2 values)
+#### 5. Health status have a significant impact on the Final grades of students (Portuguese). (Difference with Categorical variable more than 2)
+***
+***
+#### Merging both subjects' dataset into one:
+
+```{r}
+student_mat <- read.csv("students_mat.csv", stringsAsFactors = FALSE)
+student_por <- read.csv("students_por.csv", stringsAsFactors = FALSE)
+coursedata<-merge(student_mat,student_por, by=c ("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+
+```
+
+***
+# 2. Results:
+## Hypotheses-1 (Co-relation):
+#### We wish to express a co-relation between Final Portuguese Grades and Failures considering the fact that previous performances are a significant indicator and have an impact on Final Grades. 
+#### We will begin with Checking the normality of the variables and then proceed with Pearson test as independent variable (Failure) is an ordinal variable.
+```{r}
+#checking portuguese final grade for normality
+pastecs::stat.desc(coursedata$G3.y, basic=F)
+
+#skewness and kurtosis check
+tpskew<-semTools::skew(coursedata$G3.y)
+tpkurt<-semTools::kurtosis(coursedata$G3.y)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+```
+
+
+```{r}
+#Create Histogram
+gg <- ggplot(coursedata, aes(x=coursedata$G3.y))
+gg <- gg + labs(x="Final Por Grade")
+gg <- gg + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gg <- gg + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gg <- gg + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$G3.y, na.rm=TRUE), sd=sd(coursedata$G3.y, na.rm=TRUE)))
+
+gg
+```
+
+
+```{r}
+#qqplot for final potuguese Grade
+qqnorm(coursedata$G3.y)
+qqline(coursedata$G3.y, col=2)
+```
+
+
+```{r}
+#Create standardised scores and sort
+
+sort(scale(coursedata$G3.y))
+```
+#### We see that 376/382 (98.4%) of standardized values lie within the interval (+-3.29), so we can treat this variable (Portuguese Final Grades) as normal.
+
+```{r}
+#inspecting second variable (Failures)
+
+pastecs::stat.desc(coursedata$failures.y, basic=F)
+
+tpskew<-semTools::skew(coursedata$failures.y)
+tpkurt<-semTools::kurtosis(coursedata$failures.y)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+
+```
+
+
+```{r}
+#Create histogram
+
+gs <- ggplot(coursedata, aes(x=coursedata$failures.y))
+gs <- gs + labs(x="No. of Failures")
+gs <- gs + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gs <- gs + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gs <- gs + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$failures.y, na.rm=TRUE), sd=sd(coursedata$failures.y, na.rm=TRUE)))
+gs
+```
+
+
+```{r}
+#Create a qqplot and generating standardized scores
+
+qqnorm(coursedata$failures.y)
+qqline(coursedata$failures.y, col=2) #show a line on theplot
+
+sort(scale(coursedata$failures.y))
+```
+#### We see that 369/382 (96.6%) of standardized values lie within the interval (+-3.29), so we can treat this variable (Past failure in Portuguese) as normal.
+```{r}
+#Co-relation
+#Simple scatterplot of Final grades vs failures
+#aes(x,y)
+scatter <- ggplot(coursedata, aes(coursedata$failures.y, coursedata$G3.y))
+scatter + geom_point() + geom_smooth(method = "lm", colour = "Red", se = F)+ labs(x = "failures", y = "Final Portuguese grade")
+
+#Pearson Correlation
+stats::cor.test(coursedata$failures.y, coursedata$G3.y, method='pearson')
+```
+#### We observe the relationship between Past failures in Portuguese and Final Portuguese Grades was investigated using a Pearson correlation.   A moderate negative correlation was found (r =-.343, n=382, p<.001).” Through value of 'r' we can see our hypotheses was moderately true that number of past failures reflect upon the final Grades of students in potuguese.
+
+***
+***
+***
+## Hypotheses-2 (Co-relation):
+#### We want to check if there is a co-relation between Mother's and Father's Education for students to analyse the trend that most parents tend to find a partner similar to their education level.
+#### We will use the Pearson test after checking for normality.
+
+```{r}
+#Checking Variable (Mother's Education) for normality:
+
+pastecs::stat.desc(coursedata$Medu, basic=F)
+
+#skewness and kurtosis check
+tpskew<-semTools::skew(coursedata$Medu)
+tpkurt<-semTools::kurtosis(coursedata$Medu)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+```
+
+
+```{r}
+#Create Histogram
+gg <- ggplot(coursedata, aes(x=coursedata$Medu))
+gg <- gg + labs(x="Mother Education")
+gg <- gg + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gg <- gg + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gg <- gg + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$Medu, na.rm=TRUE), sd=sd(coursedata$Medu, na.rm=TRUE)))
+gg
+```
+
+
+```{r}
+#qqplot
+qqnorm(coursedata$Medu)
+qqline(coursedata$Medu, col=2)
+
+#Create standardised scores and sort
+sort(scale(coursedata$Medu))
+```
+#### We see that all standardized values lie within the interval (+-3.29), so we can treat this variable (Mother's Education) as normal.
+
+```{r}
+#inspecting second variable (Father's Education)
+pastecs::stat.desc(coursedata$Fedu, basic=F)
+
+tpskew<-semTools::skew(coursedata$Fedu)
+tpkurt<-semTools::kurtosis(coursedata$Fedu)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+```
+
+
+```{r}
+#Create histogram
+gs <- ggplot(coursedata, aes(x=coursedata$Fedu))
+gs <- gs + labs(x="Father's Education")
+gs <- gs + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gs <- gs + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gs <- gs + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$Fedu, na.rm=TRUE), sd=sd(coursedata$Fedu, na.rm=TRUE)))
+gs
+
+```
+
+
+```{r}
+#Create a qqplot
+qqnorm(coursedata$Fedu)
+qqline(coursedata$Fedu, col=2) #show a line on theplot
+
+sort(scale(coursedata$Fedu))
+```
+#### We see that all standardized values lie within the interval (+-3.29), so we can treat this variable (Father's Education) as normal.
+
+```{r}
+#Co-relation
+#Simple scatterplot of Mother's Education level vs Father's Education level
+#aes(x,y)
+scatter <- ggplot(coursedata, aes(coursedata$Fedu, coursedata$Medu))
+scatter + geom_point() + geom_smooth(method = "lm", colour = "Red", se = F)+ labs(x = "Father's Education", y = "Mother's Education")
+
+#Pearson Correlation
+stats::cor.test(coursedata$Medu, coursedata$Fedu, method='pearson')
+
+```
+
+#### We observe the relationship between Mother's Education and Father's Education was investigated using a Pearson correlation.   A strong positive correlation was found (r =0.649, n=382, p<.001).” Value of 'r>0.5' represents our hypotheses holds strong that the parents tend to chose their partner with similar education level.
+***
+***
+***
+## Hypotheses-3 (Difference):
+#### We want to check if there is significant difference in the mean of Math's Final Grades between males and females. Assuming that males tend to get higher grades than females in mathematics.
+#### We will check for Math's Final Grades for normality and see if the Male-Females are homogeneously distributed. After this we will use the T-test because the independent variable is two groups.
+```{r}
+##inspecting Math's final grades for normality and homogeneity
+pastecs::stat.desc(coursedata$G3.x, basic=F)
+
+tpskew<-semTools::skew(coursedata$G3.x)
+tpkurt<-semTools::kurtosis(coursedata$G3.x)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+```
+
+
+```{r}
+#Create histogram
+gs <- ggplot(coursedata, aes(x=coursedata$G3.x))
+gs <- gs + labs(x="Maths Final Grade")
+gs <- gs + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gs <- gs + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gs <- gs + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$G3.x, na.rm=TRUE), sd=sd(coursedata$G3.x, na.rm=TRUE)))
+gs
+```
+
+```{r}
+#Create a qqplot
+qqnorm(coursedata$G3.x)
+qqline(coursedata$G3.x, col=2) #show a line on theplot
+
+sort(scale(coursedata$G3.x))
+```
+#### Upon checking all standardized scores, we can see that all 382 results (100%) scores lie between (+-3.29), so we can treat this variable (Final Math's Grade) as normal.
+
+```{r}
+#Get descriptive stastitics by group
+psych::describeBy(coursedata$G3.x,coursedata$sex)
+```
+
+#### We can see that there is almost a uniform distribution of males and females across the dataset.
+
+```{r}
+#Running Lavene's test to check homogeneity of variance.
+car::leveneTest(G3.x~as.factor(sex), data=coursedata)
+```
+#### Test is non-significant as P-value>0.05.
+
+```{r}
+t.test(G3.x~sex, data=coursedata)
+```
+#### An independent-samples t-test was conducted to compare Math's Final Grades for male and female students. No significant difference was found in the Math's Final Grades (M=9.83, SD=4.69  for female respondents, M= 10.97, SD= 4.62 for male respondents), (t(382)= -2.391, p = 0.017). The Cohen's D statistic also indicated small effect size (0.245).
+***
+***
+***
+## Hypotheses-4 (Difference):
+#### We want to check if there is significant difference in the mean of Math's Final Grades between students who take paid extra class for maths and those who don't. Assuming that the classes might be helping them to achieve higher scores.
+#### We will check for Math's Final Grades for normality and see if those who have paid and those who haven't are uniformly distributed. After this we will use the T-test because the independent variable is two groups.
+#### ** NOTE: We have already inspected Math's Final score for normality in previous difference hypotheses-3.So starting with the Descriptive statistics with groups for Math's score with the paid extra class.
+
+```{r}
+psych::describeBy(coursedata$G3.x,coursedata$paid.x)
+```
+#### We can see that there is almost a uniform distribution of students who took and who didn't take the paid extra class for Maths across the dataset.
+
+```{r}
+car::leveneTest(G3.x~as.factor(paid.x), data=coursedata)
+```
+
+#### Test is significant as P-value<0.05. So we can't assume homogeneity of variance.
+
+```{r}
+t.test(G3.x~paid.x, data=coursedata)
+```
+
+#### “An independent-samples t-test was conducted to compare Math's Final Grades for students who took paid extra classes. Statistically Significant difference was found in the Math's Final Grades (M=9.95, SD=5.3  for those who didn't took extra class, M= 10.89, SD= 3.81 for those who took extra class), (t(382)= -2.0112, p = 0.045). The Cohen's D statistic indicated small effect size (0.209).”
+***
+***
+***
+## Hypotheses-5 (Difference- more than 2 variable):
+#### We are checking for significant difference in Portuguese's Final Grades based on the health. Assuming that the health might be one of the important variables influencing the Final Portuguese Grades.
+#### We will begin with Bartlett's test for pre-check followed by ANOVA and Tukey HSD post-hoc test due to results obtained in Bartlett's test
+
+#### ** NOTE: We have already inspected Portuguese's Final score for normality in Hypotheses-1.So starting with analysing health scores.
+
+```{r}
+#inspecting variable (health) for normality
+pastecs::stat.desc(coursedata$health.y, basic=F)
+
+tpskew<-semTools::skew(coursedata$health.y)
+tpkurt<-semTools::kurtosis(coursedata$health.y)
+tpskew[1]/tpskew[2]
+tpkurt[1]/tpkurt[2]
+```
+
+
+```{r}
+#Create histogram
+gs <- ggplot(coursedata, aes(x=coursedata$health.y))
+gs <- gs + labs(x="Student health level")
+gs <- gs + geom_histogram(binwidth=2, colour="black", aes(y=..density.., fill=..count..))
+gs <- gs + scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")
+gs <- gs + stat_function(fun=dnorm, color="red",args=list(mean=mean(coursedata$health.y, na.rm=TRUE), sd=sd(coursedata$health.y, na.rm=TRUE)))
+gs
+```
+
+```{r}
+#Create a qqplot
+qqnorm(coursedata$health.y)
+qqline(coursedata$health.y, col=2) #show a line on theplot
+
+sort(scale(coursedata$health.y))
+```
+#### Upon checking all standardized scores, we can see that all 382 results (100%) scores lie between (+-3.29), so we can treat this variable (Health score for Portuguese Students) as normal.
+#### Now beginning with analysing the difference between Final Portuguese grades and Health level.
+```{r}
+summary(scale(coursedata$G3.y))
+head(sort(scale(coursedata$G3.y)))
+
+outliers <- coursedata %>% dplyr::filter(coursedata$G3.y >3.29 | scale(G3.y) < -3.29)
+group_by(coursedata, coursedata$health.y) %>% dplyr::summarise( count = n(), mean = mean(G3.y, na.rm = TRUE), sd = sd(G3.y, na.rm = TRUE) )
+
+stats::bartlett.test(coursedata$G3.y, coursedata$health.y)
+```
+
+#### Variances are homogeneous as p-value>0.05, so we can use Tukey's test as post-hoc.
+
+```{r}
+#Basic Approach
+# Compute the analysis of variance
+res.aov <- stats::aov(coursedata$G3.y~ as.factor(coursedata$health.y), data = coursedata)
+# Summary of the analysis
+summary(res.aov)
+```
+
+
+```{r}
+stats::TukeyHSD(res.aov)
+
+```
+
+#### A between-groups analysis of variance was conducted using ANOVA to explore the impact of health on Final Portuguese Grades. Divided into five groups according to their current health status score (Group 1: Score-1; Group 2: Score-2, Group 3: Score-3, Group 4: Score-4, Group 5: Score-5). 
+#### There was a statistically significant difference at the p < .05 level in Final Portuguese scores among five groups: F(4, 377)=3.75, p<0.05. Despite reaching statistical significance, the actual difference in mean scores between groups was quite small. The effect size, calculated using eta squared was 0.04.
+#### Post-hoc comparisons using the Tukey HSD test indicated that the mean score for Group 5 (M=11.88, SD=3.20) is statistically different from Group 1 (M=13.37, SD=2.89) and Group 2 (M=13.34, SD=2.43). However other pairs (including those having Group 3 (M=12.57, SD=2.72) and Group 4 (M=12.72, SD=2.68) as well) do not have much significant difference. 
+
+# 3. Discussion:
+#### We saw that multiple factors like Failures, Paid Extra classes and Health level have moderate to significant impacts on the Scores of Students and we also observed that parents have a trend of choosing their partner amongst the same education level as theirs.
+#### Various other variables like internet, traveltime and studytime could also be used in the models to show their affects on the Grades.
+
+# 4. References:
+#### George, D., & Mallery, M. (2010). SPSS for Windows Step by Step: A Simple Guide and Reference
